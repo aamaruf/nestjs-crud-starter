@@ -8,6 +8,7 @@ import {
   FindOneOptions,
   FindOptionsWhere,
   ILike,
+  Raw,
   Repository,
   SaveOptions,
 } from 'typeorm';
@@ -16,9 +17,8 @@ import { IFindAllBaseOptions, IFindByIdBaseOptions } from '../interfaces';
 import { SuccessResponse } from '../types';
 
 export abstract class BaseService<T extends BaseEntity>
-  implements IBaseService<T>
-{
-  constructor(public repo: Repository<T>) {}
+  implements IBaseService<T> {
+  constructor(public repo: Repository<T>) { }
 
   public async isExist(filters: T): Promise<T> {
     const isExist = await this.repo.findOne({
@@ -53,12 +53,16 @@ export abstract class BaseService<T extends BaseEntity>
       searchTerm?: string;
       limit?: number;
       page?: number;
+      sortBy?: string;
+      sortOrder?: string;
     },
     options?: IFindAllBaseOptions
   ): Promise<SuccessResponse | T[]> {
-    const { searchTerm, limit: take, page, ...queryOptions } = filters;
+    const { searchTerm, limit: take, page, sortBy = 'createdAt', sortOrder = 'DESC', ...queryOptions } = filters;
     const skip = (page - 1) * take;
-
+    const order: any = {
+      [sortBy]: sortOrder,
+    }
     if (
       searchTerm &&
       this.repo.target.valueOf().hasOwnProperty('SEARCH_TERMS')
@@ -84,10 +88,32 @@ export abstract class BaseService<T extends BaseEntity>
       const where = [];
 
       for (const term of SEARCH_TERMS) {
-        where.push({
-          ...queryOptions,
-          [term]: ILike(`%${searchTerm}%`),
-        });
+        // Check if the search term is a relation
+        if (term?.includes('.')) {
+          const [relation, field] = term.split('.');
+          // Check if the relation is allowed
+          if (!relations.includes(relation)) {
+            continue;
+          }
+          where.push({
+            ...queryOptions,
+            [relation]: {
+              [field]: ILike(`%${searchTerm}%`),
+            },
+          });
+        } else if (term?.includes(':')) {
+          const [field, property] = term.split(':');
+          // search on jsonb property
+          where.push({
+            ...queryOptions,
+            [field]: Raw((alias) => `${alias} ->> '${property}' ILIKE '%${searchTerm}%'`),
+          });
+        } else {
+          where.push({
+            ...queryOptions,
+            [term]: ILike(`%${searchTerm}%`),
+          });
+        }
       }
 
       const result = await this.repo.findAndCount({
@@ -95,6 +121,7 @@ export abstract class BaseService<T extends BaseEntity>
         skip,
         take,
         relations: options?.relations || [],
+        order: order
       });
 
       return new SuccessResponse(
@@ -128,6 +155,7 @@ export abstract class BaseService<T extends BaseEntity>
         opts.relations = options?.relations || [];
       }
 
+      opts.order = order
       if (options?.withoutPaginate) {
         return await this.repo.find(opts);
       } else {
