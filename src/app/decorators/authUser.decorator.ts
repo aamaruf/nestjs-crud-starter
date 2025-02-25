@@ -1,6 +1,9 @@
-import { IAuthUser } from '../interfaces/authUser.interface';
-import { createParamDecorator } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { IAuthUser } from "../interfaces/authUser.interface";
 
-export const AuthUser = createParamDecorator((data, req): IAuthUser => {
-  return req.args[0].verifiedUser;
-});
+export const AuthUser = createParamDecorator(
+  (data: unknown, context: ExecutionContext): IAuthUser => {
+    const request = context.switchToHttp().getRequest();
+    return request?.verifiedUser;  // safely access verifiedUser
+  }
+);

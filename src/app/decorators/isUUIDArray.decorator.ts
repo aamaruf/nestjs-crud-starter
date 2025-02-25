@@ -1,12 +1,12 @@
 import { buildMessage, ValidateBy, ValidationOptions } from 'class-validator';
-import type ValidatorJS from 'validator';
+import { UUIDVersion } from 'validator';
 import isUuidValidator from 'validator/lib/isUUID';
 
 export const IS_UUID_ARRAY = 'isUuidArray';
 
 function isValidated(
   value: unknown,
-  version?: ValidatorJS.UUIDVersion
+  version?: UUIDVersion
 ): boolean {
   let isOnlyUuid = true;
   if (!Array.isArray(value)) {
@@ -21,7 +21,7 @@ function isValidated(
 }
 
 export function IsUUIDArray(
-  version?: ValidatorJS.UUIDVersion,
+  version?: UUIDVersion,
   validationOptions?: ValidationOptions
 ): PropertyDecorator {
   return ValidateBy(
@@ -40,3 +40,4 @@ export function IsUUIDArray(
     validationOptions
   );
 }
+
